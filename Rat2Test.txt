@@ -1,81 +1,107 @@
 #include "mbed.h"
-void forward(float duration, double speed); //duration in second, speed in percentage 1 = 100%
+
+// motor, timer, serial port
+PwmOut MRF(PA_7);
+PwmOut MRB(PB_6);
+PwmOut MLF(PB_10);
+PwmOut MLB(PC_7);
+Timer t;
+Serial pc(SERIAL_TX, SERIAL_RX);
+
+InterruptIn channelA(PA_1); //right encoder
+InterruptIn channelB(PC_4); //right encoder
+//PA_15, PB_3 < left encoder (they are broken)
+
+void forward(float duration, double speed); //
 void backward(float duration, double speed);
 void turnLeft(float duration, double speed);
 void turnRight(float duration, double speed);
 void brake();
- 
-// declaring motors as pwm
-PwmOut MRF(PA_7); //Motor: Right-Forward
-PwmOut MRB(PB_6); //Motor: Right-Backward
-PwmOut MLF(PB_10);
-PwmOut MLB(PC_7);
-Timer t;
 
+DigitalOut myled(LED1);
 
-int main() 
+volatile unsigned long pulses = 0;
+void incrementEncoder()
 {
-    forward(4,10); //3 second and 20% speed
-    brake();
-    turnRight(.4,20);
-    brake();
-    forward(1,10);
-    brake();
-    turnLeft(.4,20);
-    brake();
-    forward(1,10);
-    brake();
-    turnRight(.8,20);
-    brake();
-    
-    
+    pulses++;
 }
- 
+
+int main() {
+    channelA.rise(&incrementEncoder);
+    channelA.fall(&incrementEncoder);
+    channelB.rise(&incrementEncoder);
+    channelB.fall(&incrementEncoder);
+    
+    forward(4200,10); //3 second and 20% speed
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    turnLeft(700,20);
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    forward(1600,10);
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    turnRight(700,20);
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    forward(2000,10);
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    turnRight(1600,20);
+    brake();
+        pc.printf("Pulses is: %d \r\n", pulses);
+    //MRF.period(.1);
+    //MRF = .1;
+    /*MLF.period(.1);
+    MLF = .1;
+    while(1){
+        wait(1);
+        pc.printf("Pulses is: %d \r\n", pulses);
+    }*/
+
+}
+
 void forward(float duration, double speed)
 {
-    t.reset();
-    t.start();
+    pulses= 0; 
     speed = 0.01 * speed;
  //   MRF.period(0.1f); 
  //   MLF.period(0.1f); 
     MRF = speed; MLF = speed; //set speed
-    while (t.read() < duration);
+    while (pulses < duration);
     MRF = 0; MLF = 0; //set speed back to 0   
 }
  
 void turnRight(float duration, double speed)
-{
-    t.reset();
-    t.start();
+{    
+    pulses= 0; 
     speed = 0.01 * speed;
  //   MRB.period(0.1f); 
  //   MLF.period(0.1f); 
     MRB = speed; MLF = speed; //set speed
-    while (t.read() < duration);
+    while (pulses < duration);
     MRB = 0; MLF = 0; //set speed back to 0   
 }
  
 void turnLeft(float duration, double speed)
 {
-    t.reset();
-    t.start();
+    pulses= 0; 
     speed = 0.01 * speed;
  //   MRF.period(0.1f); 
  //   MLB.period(0.1f); 
     MRF = speed; MLB = speed; //set speed
-    while (t.read() < duration);
+    while (pulses < duration);
     MRF = 0; MLB = 0; //set speed back to 0   
 }
 
 void backward(float duration, double speed)
 {
-    t.reset();
-    t.start();
+    pulses= 0; 
     speed = 0.01 * speed;
  //   MRB.period(0.1f); 
  //   MLB.period(0.1f); 
     MRB = speed; MLB = speed; //set speed
-    while (t.read() < duration);
+    while (pulses < duration);
     MRB = 0; MLB = 0; //set speed back to 0   
 }
 
@@ -85,5 +111,6 @@ void brake()
     wait_ms(250);
     MRF = 0; MLF = 0; MRB = 0; MLB = 0;
 }
+
 
 
