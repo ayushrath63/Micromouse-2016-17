@@ -1,102 +1,73 @@
 #include "mbed.h"
 #include <cmath>
 
-// motor, timer, serial port
+
+// motor, timer, serial port, LED
 PwmOut MRF(PA_7);
 PwmOut MRB(PB_6);
 PwmOut MLF(PB_10);
 PwmOut MLB(PC_7);
 Timer t;
 Serial pc(SERIAL_TX, SERIAL_RX);
+DigitalOut myled(LED1);
 
+
+//encoder
 InterruptIn REncChannelA(PA_1); //right encoder
 DigitalIn REncChannelB(PC_4);
 InterruptIn LEncChannelA(PA_15); //left encoder
 DigitalIn LEncChannelB(PB_3);
-//PA_15, PB_3 < left encoder (they are broken)
-DigitalOut myled(LED1);
+Ticker SecondUpdate;  //for updating speed every second
 
+
+//Encoder function
 void updateRightEncoder();
 void updateLeftEncoder();
 volatile unsigned long RCount = 0;
 volatile unsigned long LCount = 0;
 
-void forward(int duration, double speed); //
-void backward(int duration, double speed);
-void turnLeft(int duration, double speed);
-void turnRight(int duration, double speed);
-void brake();
-float encoderPID(); //deviation
+
+//deviation & fix
+int encoderPID();
 int prevError = 0;
-int integralError = 0;
+int integralError = 0; //sum of all error
+void updateSpeed();
 
 
+int speed = 80;
+
+void setRightMotor(int speed)
+{
+    MRF = (float)speed/255.0f;
+}
+void setLeftMotor(int speed)
+{
+    MLF = (float)speed/255.0f;
+}
 
 int main() {
-    t.reset();
     REncChannelA.rise(&updateRightEncoder);
-    //LEncChannelA.rise(&updateLeftEncoder);
-    
-    
-    backward(-300,10);
-    brake();
-    pc.printf("Pulses is: %d \r\n", RCount);
-    
-    forward(1200,10); //3 second and 20% speed
-    brake();
-    pc.printf("Pulses is: %d \r\n", RCount);
-    backward(-900,10);
-    brake();
-    pc.printf("Pulses is: %d \r\n", RCount);
-}
+    LEncChannelA.rise(&updateLeftEncoder);
+    SecondUpdate.attach(&updateSpeed,0.2);
+    t.reset();
 
-void forward(int duration, double speed)
+}
+float elapsedTime=0; //erase in the future
+void updateSpeed()
 {
-    RCount= 0;
-    speed = 0.01 * speed;
-    MRF = speed; MLF = speed; //set speed
-    while (RCount != duration);
-    MRF = 0; MLF = 0; //set speed back to 0
-}
-void backward(int duration, double speed)
-{
-    RCount= 0;
-    speed = 0.01 * speed;
-    MRB = speed; MLB = speed; //set speed
-    while (RCount != duration);
-    MRB = 0; MLB = 0; //set speed back to 0
-}
+    setRightMotor(speed + encoderPID());
+    setLeftMotor(speed - encoderPID());
+    //pc.printf("encoder value is %f \r\n", encoderPID());
+    pc.printf("diff is: %d \r\n", LCount - RCount);
+    //pc.printf("speedR is: %f \r\n", MRF.read());
+    //pc.printf("speedL is: %f \r\n", MLF.read());
+    pc.printf("elapsedTime: %f \r\n\n", elapsedTime);
+
+    elapsedTime+=.2;
+};
 
 
-void turnRight(int duration, double speed)
-{
-    RCount= 0;
-    speed = 0.01 * speed;
-    //   MRB.period(0.1f);
-    //   MLF.period(0.1f);
-    MRB = speed; MLF = speed; //set speed
-    while (RCount != duration);
-    MRB = 0; MLF = 0; //set speed back to 0
-}
 
-void turnLeft(int duration, double speed)
-{
-    RCount= 0;
-    speed = 0.01 * speed;
-    //   MRF.period(0.1f);
-    //   MLB.period(0.1f);
-    MRF = speed; MLB = speed; //set speed
-    while (RCount != duration);
-    MRF = 0; MLB = 0; //set speed back to 0
-}
-
-
-void brake()
-{
-    MRF = 1; MLF = 1; MRB = 1; MLB = 1;
-    wait_ms(500);
-    MRF = 0; MLF = 0; MRB = 0; MLB = 0;
-}
 
 void updateRightEncoder()
 {
@@ -105,22 +76,30 @@ void updateRightEncoder()
     else RCount++;
 }
 
+
 void updateLeftEncoder()
 {
-    if(LEncChannelB.read())
-        LCount--;
-    else LCount++;
+    if(LEncChannelB.read()) //changed signs bc it would read opposite
+        LCount++;
+    else LCount--;
 }
 
-float encoderPID()
+
+int encoderPID() //1 through 0.1 current if we want to stay at speed .1
 {
-    float kp = 1.0;
-    float ki = 1.0;
-    float kd = 1.0;
+    float kp = .6; // w/o PID, the error is around 24 (unit error = 24),  so 20% change in speed every unit error
+    float ki = 0;//0.008; //w/i ID unit error is 4, so 0.8% additional change every unit error
+    float kd = 0;//.002; // 0.2% change
     int error = LCount - RCount;
     integralError += error;
-    float returnVal = kp*error + ki*integralError + kd*(error - prevError);
+    int returnVal = (int)(kp*(float)error + ki*integralError + kd*(error - prevError));
+
+    //pc.printf("kp*error is: %f \r\n", kp*error);   //debugging process
+    //pc.printf("kp*integral error is: %f \r\n", ki*integralError);
+    //pc.printf("kp*deriv error is: %f \r\n", kd*(error - prevError));
+    //pc.printf("returnVal: %f \r\n", returnVal);
+    //pc.printf("\n");
+
     prevError = error;
     return returnVal;
 }
-
