@@ -1,27 +1,20 @@
 #include "mbed.h"
 
-// motor, timer, serial port
-
 Timer t;
 Serial pc(SERIAL_TX, SERIAL_RX);
 
-
-InterruptIn channelA(PA_1); //right encoder
 InterruptIn channelB(PC_4); //right encoder
-//PA_15, PB_3 < left encoder (they are broken)
 
 
 
 class Motor
 {
 public:
-    Motor(PwmOut motorF, PwmOut motorB)
+    Motor(PwmOut* motorF, PwmOut* motorB)
     {
         _motorF = motorF;
         _motorB = motorB;
-        _period = .1;
-        _motorF.period = _period;
-        _motorB.period = _period;
+        _speed = 0;
     }
     void setSpeed(float speed)
     {
@@ -29,18 +22,18 @@ public:
         _speed = speed;
         if (_speed > 0)
         {
-            _motorF = _speed;
-            _motorB = 0;
+            _motorF->write(speed);
+            _motorB->write(0);
         }
         else if (_speed <0)
         {
-            _motorF = 0;
-            _motorB = _speed;
+            _motorF->write(0);
+            _motorB->write(speed);
         }
         else
         {
-            _motorF = 0;
-            _motorB = 0;
+            _motorF->write(0);
+            _motorB->write(0);
         }
         
     }
@@ -50,25 +43,28 @@ public:
     }
     void stop()
     {
-        _motorF = 1;
-        _motorB = 1;
+        _speed=0;
+        _motorF->write(1);
+        _motorB->write(1);
         wait(.5);
-        _motorF = 0;
-        _motorB = 0;        _
+        _motorF->write(0);
+        _motorB->write(0);
     }
 private:
-    PwmOut _motorF, _motorB;
+    PwmOut *_motorF, *_motorB;
     float _speed;
-    float _period;
-    int _motorF, _motorB
 };
 
-Motor RightMotor(PwmOut MRF(PA_7), PwmOut MRB(PB_6));
-Motor LeftMotor(PwmOut MLF(PB_10), PwmOut MLB(PC_7));
+PwmOut MRF(PA_7);
+PwmOut MRB(PB_6);
+PwmOut MLF(PB_10);
+PwmOut MLB(PC_7);
+
+Motor RightMotor(&MRF, &MRB);
+Motor LeftMotor(&MLF, &MLB);
 
 
 DigitalOut myled(LED1);
-
 
 volatile unsigned long pulses = 0;
 void incrementEncoder()
@@ -76,26 +72,17 @@ void incrementEncoder()
     pulses++;
 }
 
-int PID(
 
-
-int main() {
-
-
-    channelA.rise(&incrementEncoder);
-    channelA.fall(&incrementEncoder);
-    channelB.rise(&incrementEncoder);
-    channelB.fall(&incrementEncoder);
-    
-    //MRF.period(.1);
-    //MRF = .1;
+int main()
+{
     RightMotor.setSpeed(.1); //off for .09 and on for .01
-    LeftMotor.setSpeed(.1);
+    //LeftMotor.setSpeed(.1);
+    (&MRF)->write(.5);
+    
     while(1){
         wait(1);
         pc.printf("Pulses is: %d \r\n", pulses);
+        pc.printf("%f", RightMotor.getSpeed());
     }
-
-
 }
 
