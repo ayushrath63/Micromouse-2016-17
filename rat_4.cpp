@@ -12,50 +12,69 @@ AnalogIn IRR_FL(PC_1);
 AnalogIn IRR_R(PA_0);
 AnalogIn IRR_L(PC_0);
 
-Ticker IR_FL_F;  //for updating speed every second
+DigitalOut myled(LED1);
+
+Ticker IR_R_F;  //for updating speed every second
 Ticker second;
 Ticker third;
 Ticker fourth;
 
 Serial pc(SERIAL_TX,SERIAL_RX);
-
- int base = 0;
+float base = 0;
 
 void calibrateIR()
 {
     for(int i = 0; i < 50; i++)
     {
-        base+=IR_R.read();
+        IR_R = 1;
+        base+=IRR_R.read();
+        wait(.01);
+        IR_R = 0;
+        pc.printf("calibrating: %f \n", base);
     }
-    base /=50;
+    base /= 50;
 }
 
 
-void IR_FL_read()
+void IR_R_read()
 {
     IR_R = 1;
     wait(.01);
-    pc.printf("Left Forward Distance: %d \r\n", IRR_R.read() - base);
     IR_R = 0;
 }
 
 int main()
 {
     calibrateIR();
-
-    IR_FL_F.attach(&IR_FL_read, 1);
+    //IR_R_F.attach(&IR_R_read, 1);
     /*second.attach(&second_func,1);
      third.attach(&third_fun,1);
      fourth.attach(&fourth_func, 1);
-
+     */
      while(1)
      {
-     pc.printf("Left Forward Distance: %d \r\n", IR_FL.read());
-     //pc.printf("Right Forward Distance: %d \r\n", IR_FR.read());
-     //pc.printf("Right Distance: %d \r\n", IR_R.read());
-     //pc.printf("Left Distance: %d \r\n\n", IR_L.read());
-     wait(1.0);
-     }*/
+        IR_R = 1;
+        pc.printf("Right Distance: %f \r\n", IRR_R.read() - base);
+        wait(.01);
+        IR_R = 0;
+
+        IR_FL=1;
+        pc.printf("Left Forward Distance: %f \r\n", IRR_FL.read() - base);
+        wait(.01);
+        IR_FL = 0;
+
+        IR_FR = 1;
+        pc.printf("Right Forward Distance: %f \r\n", IRR_FR.read() - base);
+        wait(.01);
+        IR_FR = 0;
+
+        IR_L = 1;
+        pc.printf("Left Distance: %f \r\n\n", IRR_L.read() - base);
+        wait(.01);
+        IR_L = 0;
+
+        wait(1);
+     }
 }
 
 
