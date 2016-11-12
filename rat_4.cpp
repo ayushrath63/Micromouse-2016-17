@@ -20,19 +20,24 @@ Ticker third;
 Ticker fourth;
 
 Serial pc(SERIAL_TX,SERIAL_RX);
-float base = 0;
 
-void calibrateIR()
+float baseR = 0;
+float baseL = 0;
+float baseFL = 0;
+float baseFR = 0;
+void calibrateIRR()
 {
     for(int i = 0; i < 50; i++)
     {
-        IR_R = 1;
-        base+=IRR_R.read();
-        wait(.01);
-        IR_R = 0;
-        pc.printf("calibrating: %f \n", base);
+        baseR+=IRR_R.read();
+        baseL+=IRR_L.read();
+        baseFR+=IRR_FR.read();
+        baseFL+=IRR_FL.read();
     }
-    base /= 50;
+    baseR /= 50;
+    baseL /= 50;
+    baseFL /= 50;
+    baseFR /= 50;
 }
 
 
@@ -45,7 +50,7 @@ void IR_R_read()
 
 int main()
 {
-    calibrateIR();
+    calibrateIRR();
     //IR_R_F.attach(&IR_R_read, 1);
     /*second.attach(&second_func,1);
      third.attach(&third_fun,1);
@@ -54,22 +59,25 @@ int main()
      while(1)
      {
         IR_R = 1;
-        pc.printf("Right Distance: %f \r\n", IRR_R.read() - base);
+
+         //float rightReading = (IRR_R.read() - baseR) * (100 - 0) / (1 - baseR) + 0;
+
+        pc.printf("Right Distance: %f \r\n", 33*(IRR_R.read() - baseR));
         wait(.01);
         IR_R = 0;
 
         IR_FL=1;
-        pc.printf("Left Forward Distance: %f \r\n", IRR_FL.read() - base);
+        pc.printf("Left Forward Distance: %f \r\n", 33*(IRR_FL.read() - baseFL));
         wait(.01);
         IR_FL = 0;
 
         IR_FR = 1;
-        pc.printf("Right Forward Distance: %f \r\n", IRR_FR.read() - base);
+        pc.printf("Right Forward Distance: %f \r\n", 33*(IRR_FR.read() - baseFR));
         wait(.01);
         IR_FR = 0;
 
         IR_L = 1;
-        pc.printf("Left Distance: %f \r\n\n", IRR_L.read() - base);
+        pc.printf("Left Distance: %f \r\n\n", 33*(IRR_L.read() - baseL));
         wait(.01);
         IR_L = 0;
 
