@@ -38,13 +38,14 @@ void printIR_array();
 void turnLeft(int duration, double speed);
 void turnRight(int duration, double speed);
 void forward(int duration, double speed);
+void backward(int duration, double speed);
 void brake();
 void calibrateFront();
 
 //Global Variable
-float speed = 0.4;
+float speed = 0.35;
 float tspeed = 0.2;
-const int IRF_THRESHOLD = 75;
+const int IRF_THRESHOLD = 85;
 const int IRF_THRESHOLD2= 45;
 bool calibrated = false;
 float calibrate_time = 1; //2 seconds
@@ -61,13 +62,15 @@ int main() {
     calibrated = false;
     while(1)
     {
-        IR_Readings(IR_array); //read arrat
-        if (IR_array[1] < IRF_THRESHOLD || IR_array[2] < IRF_THRESHOLD) //if it sees wall
+        IR_Readings(IR_array); //read array        
+        if (IR_array[1] < IRF_THRESHOLD && IR_array[2] < IRF_THRESHOLD) //if it sees wall
         {
             myled = 1; wait(0.1); myled = 0;
-            MRF=0;MLF=0;MRB=0;MLB=0;
-            wait(0.1);
+            brake();
             calibrateFront();
+            //backward(1, 0.05);
+            brake();
+            
             wait(1);
             myled = 1; wait(0.1); myled = 0;
             if (IR_array[0] < IR_array[3])
@@ -101,12 +104,12 @@ int main() {
         {
             float LeftIRDifference = IR_array[0]-IR_array_past[0];
             float RightIRDifference = IR_array[3]-IR_array_past[3];
-            if (abs(RightIRDifference) > 20)//if the distance is bigger than 2nd threshold continue
+            if (abs(RightIRDifference) > 20)//if the distance is bigger than 2nd threshold contine
             {
                 MLF = speed + PID(IR_array[3],IR_array_past[3],0.2,0.008,0.002);
                 MRF = speed - PID(IR_array[3],IR_array_past[3],0.2,0.008,0.002); //HERE
             }
-            else if (abs(LeftIRDifference) > 20)//if the distance is bigger than 2nd threshold continue
+            else if (abs(LeftIRDifference) > 20)//if the distance is bigger than 2nd threshold contine
             {
                 MRF = speed + PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002);
                 MLF = speed - PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002); //HERE
@@ -200,22 +203,41 @@ void forward(int duration, double speed)
     MRF = 0; MLF = 0; //set speed back to 0
 }
 
+void backward(int duration, double speed)
+{
+    RCount= 0; LCount = 0;
+    MRB = speed; MLB = speed; //set speed
+    while (RCount != -1*duration);
+    MRB = 0; MLB = 0; //set speed back to 0
+}
+
+void brake()
+{
+    MRB = 1; MRF = 0; MLB = 0; MLF = 0;
+    wait(0.1);
+    MRB = 0; MRF = 0; MLB = 0; MLF = 0;
+}
+
 void calibrateFront() //this needs some work
 {
-    float speed=0.1;
+    float speed=0.05;
     int threshold1 = 4;
     while(abs(IR_array[1] - IR_array[2]) > threshold1)
     {
         IR_Readings(IR_array);
         if(IR_array[1]>IR_array[2])
         {
-            MLF = speed;
             MRF = 0;
+            MLF = speed;
+            MRB = speed;
+            MLB = 0;
         }
         else
         {
             MRF = speed;
             MLF = 0;
+            MRB = 0;
+            MLB = speed;
         }
     }
     MRF = 0; MLF = 0; MRB = 0; MLB = 0; //set speed back to 0
