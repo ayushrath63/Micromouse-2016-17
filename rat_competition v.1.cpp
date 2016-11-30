@@ -1,5 +1,5 @@
 #include "mbed.h"
-
+#include <cmath>
 //IR Emitter
 DigitalOut IR_FL(PB_0);  DigitalOut IR_FR(PC_11); DigitalOut IR_L(PB_7); DigitalOut IR_R(PC_10);
 //IR_Reader/Receiver
@@ -22,10 +22,10 @@ volatile unsigned long RCount = 0;
 volatile unsigned long LCount = 0;
 
 DigitalOut myled(LED1);
+Ticker print_IR_Ticker;
 Ticker IR_Ticker;
 Serial pc(SERIAL_TX,SERIAL_RX);
-Timer t;
-
+Timer t; //global
 
 //IR function
 
@@ -37,34 +37,48 @@ void printIR_array();
 //movement function
 void turnLeft(int duration, double speed);
 void turnRight(int duration, double speed);
+void forward(int duration, double speed);
 void brake();
+void calibrateFront();
 
 //Global Variable
-float speed = 0.2;
+float speed = 0.4;
+float tspeed = 0.2;
 const int IRF_THRESHOLD = 75;
+const int IRF_THRESHOLD2= 45;
 bool calibrated = false;
-int calibrate_time = 2; //2 seconds
-
-
+float calibrate_time = 1; //2 seconds
 
 int main() {
-    //print every second
-    IR_Ticker.attach(&printIR_array,1);
+    //print IR, count encoder Interrupt
+    print_IR_Ticker.attach(&printIR_array,1);
     REncChannelA.rise(&updateRightEncoder);
     LEncChannelA.rise(&updateLeftEncoder);
     
     //
+    wait(2); //wait 2 second before startiing
     t.start();
+    calibrated = false;
     while(1)
     {
-        IR_Readings(IR_array);
-        //if encounter wall
-        if (IR_array[1] < IRF_THRESHOLD || IR_array[2] < IRF_THRESHOLD)
+        IR_Readings(IR_array); //read arrat
+        if (IR_array[1] < IRF_THRESHOLD || IR_array[2] < IRF_THRESHOLD) //if it sees wall
         {
-            MRF = 0; MLF = 0;
-            turnRight(300,0.2); ///problematic
-            calibrated = false;
-            resetPID(); //PID function will be used by different entitiy now gotta reset it once doen using
+            myled = 1; wait(0.1); myled = 0;
+            MRF=0;MLF=0;MRB=0;MLB=0;
+            wait(0.1);
+            calibrateFront();
+            wait(1);
+            myled = 1; wait(0.1); myled = 0;
+            if (IR_array[0] < IR_array[3])
+                turnRight(140,tspeed); //90degrees
+            else
+                turnLeft(140,tspeed);
+            calibrated = true; //work from here
+            MRF=0;MLF=0;MRB=0;MLB=0;
+            wait(1);
+            forward(60,tspeed);
+            
         }
         
         //forward relying on both wall
@@ -85,8 +99,23 @@ int main() {
         //forward relying on left wall
         else
         {
-            MRF = speed + PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002);
-            MLF = speed - PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002); //HERE
+            float LeftIRDifference = IR_array[0]-IR_array_past[0];
+            float RightIRDifference = IR_array[3]-IR_array_past[3];
+            if (abs(RightIRDifference) > 20)//if the distance is bigger than 2nd threshold contine
+            {
+                MLF = speed + PID(IR_array[3],IR_array_past[3],0.2,0.008,0.002);
+                MRF = speed - PID(IR_array[3],IR_array_past[3],0.2,0.008,0.002); //HERE
+            }
+            else if (abs(LeftIRDifference) > 20)//if the distance is bigger than 2nd threshold contine
+            {
+                MRF = speed + PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002);
+                MLF = speed - PID(IR_array[0],IR_array_past[0],0.2,0.008,0.002); //HERE
+            }
+            else
+            {
+                MRF = speed;
+                MLF = speed;
+            }
         }
     }
 }
@@ -149,9 +178,8 @@ void updateLeftEncoder()
 void turnRight(int duration, double speed)
 {
     RCount= 0; LCount = 0;
-    speed = 0.01 * speed;
-    MRB = speed; MLF = speed; //set speed
-    while (RCount != duration);
+    MLF = speed; MRB = speed; //set speed
+    while (LCount != duration);
     MRB = 0; MLF = 0; //set speed back to 0
 }
 
@@ -163,4 +191,33 @@ void turnLeft(int duration, double speed)
     MRF = 0; MLB = 0; //set speed back to 0
 }
 
+
+void forward(int duration, double speed)
+{
+    RCount= 0; LCount = 0;
+    MRF = speed; MLF = speed; //set speed
+    while (RCount != duration);
+    MRF = 0; MLF = 0; //set speed back to 0
+}
+
+void calibrateFront() //this needs some work
+{
+    float speed=0.1;
+    int threshold1 = 4;
+    while(abs(IR_array[1] - IR_array[2]) > threshold1)
+    {
+        IR_Readings(IR_array);
+        if(IR_array[1]>IR_array[2])
+        {
+            MLF = speed;
+            MRF = 0;
+        }
+        else
+        {
+            MRF = speed;
+            MLF = 0;
+        }
+    }
+    MRF = 0; MLF = 0; MRB = 0; MLB = 0; //set speed back to 0
+}
 
